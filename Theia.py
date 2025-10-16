@@ -18,7 +18,16 @@ MODEL_SIZE = "base"  # Change to "small", "medium", "large" for better accuracy
 class TranscriberApp:
     def __init__(self, master):
         self.master = master
-        master.title("Whisper Real-Time Transcriber")
+        master.title("Theia real time transcriber")
+
+        # Logging setup: write transcripts with timestamps to a file in append mode
+        self.log_file_path = "transcript_log.txt"
+        try:
+            # Try opening once to ensure we can write to it (will create if missing)
+            with open(self.log_file_path, "a", encoding="utf-8"):
+                pass
+        except Exception as e:
+            print(f"Warning: could not open log file '{self.log_file_path}' for appending: {e}")
 
         # Main transcript area: make it expand and center text
         self.text = tk.Text(master, height=20, width=80, font=("Arial", 16), wrap='word')
@@ -102,11 +111,27 @@ class TranscriberApp:
                 self.transcript_queue.put(f"Error: {e}")
 
     def update_gui(self):
+        # Process all new transcript entries in the queue
         while not self.transcript_queue.empty():
+            # Get the next transcribed text from the queue
             text = self.transcript_queue.get()
-            # Insert new transcript line with the 'center' tag so lines are horizontally centered
+            # Insert the new transcript line at the end of the Text widget
+            # The 'center' tag ensures the text is horizontally centered in the widget
+            # Insert the transcribed text at the end of the Text widget.
+            # tk.END: position to insert at the end of the widget
+            # text + "\n": the actual transcript line, with a newline to start a new line
+            # "center": tag to center the text horizontally
             self.text.insert(tk.END, text + "\n", "center")
-            # Keep view at the end so new lines push older lines upward (scroll up effect)
+            # Also append the transcript to the log file with an ISO-8601 timestamp
+            try:
+                ts = __import__("datetime").datetime.now().astimezone().isoformat()
+                with open(self.log_file_path, "a", encoding="utf-8") as f:
+                    f.write(f"[{ts}] {text}\n")
+            except Exception as e:
+                # If logging fails, print a warning but keep running
+                print(f"Warning: failed to write to log file: {e}")
+            # Scroll the Text widget to the end so the latest line is always visible at the bottom
+            # This makes older lines move up as new lines are added
             self.text.see(tk.END)
         # Update volume meter if we have a recent level
         try:
